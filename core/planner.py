@@ -4,6 +4,8 @@ import urllib.request
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "llama3.2:3b"
+KEEP_ALIVE = "30m"
+MAX_RESPONSE_TOKENS = 512
 
 
 class Planner:
@@ -20,7 +22,9 @@ class Planner:
         payload = json.dumps({
             "model": MODEL,
             "prompt": prompt,
-            "stream": False
+            "stream": False,
+            "keep_alive": KEEP_ALIVE,
+            "num_predict": MAX_RESPONSE_TOKENS,
         }).encode("utf-8")
 
         request = urllib.request.Request(

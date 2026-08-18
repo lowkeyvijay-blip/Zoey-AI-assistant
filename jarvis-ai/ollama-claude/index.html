@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="J.A.R.V.I.S. — AI Assistant powered by Ollama (local) or Claude API. Voice-enabled, futuristic HUD interface.">
+    <title>J.A.R.V.I.S. — AI Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <!-- Ambient Background -->
+    <div class="ambient-bg">
+        <div class="particle-field" id="particleField"></div>
+        <div class="hex-grid" id="hexGrid"></div>
+        <div class="grid-overlay"></div>
+        <div class="scan-line"></div>
+        <div class="vignette"></div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsOverlay">
+        <div class="modal" id="settingsModal">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <span class="modal-icon">⚙</span>
+                    <h2 class="modal-title">SYSTEM CONFIGURATION</h2>
+                </div>
+                <button class="modal-close" id="settingsClose">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label class="setting-label" for="backendSelect">
+                        <span class="label-icon">🤖</span>
+                        AI BACKEND
+                    </label>
+                    <p class="setting-desc">Choose between a local Ollama model or the Claude API (Anthropic).</p>
+                    <select id="backendSelect" class="setting-select">
+                        <option value="ollama">Ollama (Local — Privacy First)</option>
+                        <option value="claude">Claude API (Anthropic)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label" for="ollamaUrlInput">
+                        <span class="label-icon">🖥️</span>
+                        OLLAMA SERVER URL
+                    </label>
+                    <p class="setting-desc">Default is <code>http://localhost:11434</code>. Start Ollama with <code>ollama serve</code>, then pull a model: <code>ollama pull qwen2.5:7b</code></p>
+                    <input type="text" id="ollamaUrlInput" placeholder="http://localhost:11434" autocomplete="off" spellcheck="false" value="http://localhost:11434">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label" for="apiKeyInput">
+                        <span class="label-icon">🔑</span>
+                        CLAUDE API KEY
+                    </label>
+                    <p class="setting-desc">Only needed if using Claude API backend. Get one at <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a></p>
+                    <div class="api-key-wrapper">
+                        <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+                        <button class="toggle-visibility" id="toggleKeyVisibility" title="Show/hide key">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="api-status" id="apiStatus">
+                        <span class="api-dot"></span>
+                        <span class="api-text">Configure backend above to connect</span>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <span class="label-icon">🧠</span>
+                        AI MODEL
+                    </label>
+                    <select id="modelSelect" class="setting-select">
+                        <optgroup label="Ollama Models (local)">
+                            <option value="qwen2.5:7b">Qwen 2.5 7B — Balanced (recommended)</option>
+                            <option value="qwen2.5:14b">Qwen 2.5 14B — More capable</option>
+                            <option value="qwen2.5:3b">Qwen 2.5 3B — Fastest / low RAM</option>
+                            <option value="llama3.1:8b">Llama 3.1 8B</option>
+                            <option value="mistral:7b">Mistral 7B</option>
+                            <option value="phi3:mini">Phi-3 Mini — Ultralight</option>
+                            <option value="gemma2:9b">Gemma 2 9B</option>
+                        </optgroup>
+                        <optgroup label="Claude API Models">
+                            <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Latest / Recommended)</option>
+                            <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (Fastest)</option>
+                            <option value="claude-opus-4-6">Claude Opus 4.6 (Most Capable)</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <span class="label-icon">🔊</span>
+                        VOICE SETTINGS
+                    </label>
+                    <div class="voice-settings-grid">
+                        <div class="voice-setting">
+                            <span class="vs-label">Voice</span>
+                            <select id="voiceSelect" class="setting-select">
+                                <option value="auto">Auto-detect best</option>
+                            </select>
+                        </div>
+                        <div class="voice-setting">
+                            <span class="vs-label">Speed</span>
+                            <input type="range" id="voiceRate" min="0.5" max="2" step="0.1" value="1.0" class="setting-range">
+                            <span class="range-value" id="voiceRateValue">1.0x</span>
+                        </div>
+                        <div class="voice-setting">
+                            <span class="vs-label">Pitch</span>
+                            <input type="range" id="voicePitch" min="0.5" max="2" step="0.1" value="1.0" class="setting-range">
+                            <span class="range-value" id="voicePitchValue">1.0x</span>
+                        </div>
+                        <div class="voice-setting">
+                            <label class="toggle-setting">
+                                <input type="checkbox" id="autoSpeak" checked>
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-text">Auto-speak responses</span>
+                            </label>
+                        </div>
+                        <div class="voice-setting">
+                            <label class="toggle-setting">
+                                <input type="checkbox" id="continuousListen">
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-text">Continuous listening mode</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="settingsCancelBtn">Cancel</button>
+                <button class="btn-primary" id="settingsSaveBtn">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top HUD Bar -->
+    <header class="hud-bar top-bar" id="topBar">
+        <div class="hud-bar-left">
+            <div class="status-indicator" id="statusIndicator">
+                <span class="pulse-dot" id="mainPulseDot"></span>
+                <span class="status-text" id="statusText">INITIALIZING</span>
+            </div>
+            <div class="hud-divider"></div>
+            <div class="system-label">STARK INDUSTRIES</div>
+        </div>
+        <div class="hud-bar-center">
+            <h1 class="jarvis-title">
+                <span class="letter" data-letter="J">J</span><span class="dot">.</span><span class="letter" data-letter="A">A</span><span class="dot">.</span><span class="letter" data-letter="R">R</span><span class="dot">.</span><span class="letter" data-letter="V">V</span><span class="dot">.</span><span class="letter" data-letter="I">I</span><span class="dot">.</span><span class="letter" data-letter="S">S</span><span class="dot">.</span>
+            </h1>
+            <p class="jarvis-subtitle">Just A Rather Very Intelligent System</p>
+        </div>
+        <div class="hud-bar-right">
+            <div class="datetime-display">
+                <span class="time" id="currentTime">00:00:00</span>
+                <span class="date" id="currentDate">2026.06.01</span>
+            </div>
+            <div class="hud-divider"></div>
+            <button class="settings-btn" id="settingsBtn" title="System Configuration">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Left Panel -->
+        <aside class="side-panel left-panel" id="leftPanel">
+            <div class="panel-header">
+                <span class="panel-icon">◆</span>
+                <span class="panel-title">SYSTEM DIAGNOSTICS</span>
+            </div>
+            <div class="panel-content">
+                <div class="diagnostic-item">
+                    <div class="diag-top">
+                        <span class="diag-label">AI Engine</span>
+                        <span class="diag-value" id="aiEngineStatus">OFFLINE</span>
+                    </div>
+                    <div class="diag-bar"><div class="diag-fill" id="aiEngineBar" style="--fill-width: 0%;"></div></div>
+                </div>
+                <div class="diagnostic-item">
+                    <div class="diag-top">
+                        <span class="diag-label">Voice Module</span>
+                        <span class="diag-value" id="voiceModuleStatus">READY</span>
+                    </div>
+                    <div class="diag-bar"><div class="diag-fill" style="--fill-width: 100%;"></div></div>
+                </div>
+                <div class="diagnostic-item">
+                    <div class="diag-top">
+                        <span class="diag-label">Speech Synthesis</span>
+                        <span class="diag-value">ACTIVE</span>
+                    </div>
+                    <div class="diag-bar"><div class="diag-fill" style="--fill-width: 100%;"></div></div>
+                </div>
+                <div class="diagnostic-item">
+                    <div class="diag-top">
+                        <span class="diag-label">Memory Usage</span>
+                        <span class="diag-value" id="memoryUsage">0 msgs</span>
+                    </div>
+                    <div class="diag-bar"><div class="diag-fill" id="memoryBar" style="--fill-width: 5%;"></div></div>
+                </div>
+                <div class="diagnostic-item">
+                    <div class="diag-top">
+                        <span class="diag-label">Security</span>
+                        <span class="diag-value">AES-256</span>
+                    </div>
+                    <div class="diag-bar"><div class="diag-fill" style="--fill-width: 100%;"></div></div>
+                </div>
+            </div>
+
+            <div class="panel-header" style="margin-top: 1.5rem;">
+                <span class="panel-icon">◆</span>
+                <span class="panel-title">ACTIVE MODULES</span>
+            </div>
+            <div class="panel-content">
+                <div class="process-list" id="processList">
+                    <div class="process-item active">
+                        <span class="proc-dot"></span>
+                        <span class="proc-name">speech_recognition.sys</span>
+                    </div>
+                    <div class="process-item" id="claudeProcess">
+                        <span class="proc-dot"></span>
+                        <span class="proc-name">gemini_ai.engine</span>
+                    </div>
+                    <div class="process-item active">
+                        <span class="proc-dot"></span>
+                        <span class="proc-name">hud_renderer.gl</span>
+                    </div>
+                    <div class="process-item active">
+                        <span class="proc-dot"></span>
+                        <span class="proc-name">voice_synth.core</span>
+                    </div>
+                    <div class="process-item active">
+                        <span class="proc-dot"></span>
+                        <span class="proc-name">waveform_viz.gpu</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-header" style="margin-top: 1.5rem;">
+                <span class="panel-icon">◆</span>
+                <span class="panel-title">CONVERSATION</span>
+            </div>
+            <div class="panel-content">
+                <div class="convo-stats">
+                    <div class="stat-item">
+                        <span class="stat-val" id="totalMessages">0</span>
+                        <span class="stat-label">Messages</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-val" id="totalTokens">0</span>
+                        <span class="stat-label">Tokens</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-val" id="sessionTime">00:00</span>
+                        <span class="stat-label">Uptime</span>
+                    </div>
+                </div>
+                <button class="clear-chat-btn" id="clearChatBtn">🗑 Clear Conversation</button>
+            </div>
+        </aside>
+
+        <!-- Center Section -->
+        <section class="center-section">
+            <!-- Arc Reactor Core -->
+            <div class="arc-reactor-container" id="arcReactor">
+                <div class="reactor-ring ring-outer">
+                    <div class="ring-segment" style="--i:0"></div>
+                    <div class="ring-segment" style="--i:1"></div>
+                    <div class="ring-segment" style="--i:2"></div>
+                    <div class="ring-segment" style="--i:3"></div>
+                    <div class="ring-segment" style="--i:4"></div>
+                    <div class="ring-segment" style="--i:5"></div>
+                    <div class="ring-segment" style="--i:6"></div>
+                    <div class="ring-segment" style="--i:7"></div>
+                    <div class="ring-segment" style="--i:8"></div>
+                    <div class="ring-segment" style="--i:9"></div>
+                    <div class="ring-segment" style="--i:10"></div>
+                    <div class="ring-segment" style="--i:11"></div>
+                </div>
+                <div class="reactor-ring ring-mid-outer"></div>
+                <div class="reactor-ring ring-middle"></div>
+                <div class="reactor-ring ring-inner"></div>
+                <div class="reactor-core">
+                    <div class="core-glow"></div>
+                    <div class="core-pulse"></div>
+                    <div class="core-center"></div>
+                </div>
+                <canvas id="waveformCanvas" width="220" height="60"></canvas>
+                <div class="reactor-status" id="reactorStatus">INITIALIZING</div>
+            </div>
+
+            <!-- Chat Area -->
+            <div class="chat-container" id="chatContainer">
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Messages added dynamically -->
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area" id="inputArea">
+                <div class="input-wrapper" id="inputWrapper">
+                    <div class="input-glow"></div>
+                    <button class="voice-btn" id="voiceBtn" title="Click to speak">
+                        <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/>
+                            <line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                        <div class="voice-ripple"></div>
+                        <div class="voice-ripple r2"></div>
+                    </button>
+                    <input type="text" id="userInput" placeholder="Speak or type a command, sir..." autocomplete="off" spellcheck="false">
+                    <div class="input-actions">
+                        <button class="send-btn" id="sendBtn" title="Send Command">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"/>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="input-meta">
+                    <span class="mic-status" id="micStatus">🎤 Click mic or press & hold Space to speak</span>
+                    <span class="ai-badge" id="aiBadge">OFFLINE MODE</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel -->
+        <aside class="side-panel right-panel" id="rightPanel">
+            <div class="panel-header">
+                <span class="panel-icon">◆</span>
+                <span class="panel-title">ACTIVITY LOG</span>
+            </div>
+            <div class="panel-content">
+                <div class="activity-feed" id="activityFeed"></div>
+            </div>
+
+            <div class="panel-header" style="margin-top: 1.5rem;">
+                <span class="panel-icon">◆</span>
+                <span class="panel-title">QUICK COMMANDS</span>
+            </div>
+            <div class="panel-content">
+                <div class="quick-commands">
+                    <button class="quick-cmd" data-cmd="What's the current time and date?">🕐 Time</button>
+                    <button class="quick-cmd" data-cmd="Tell me something funny">😄 Joke</button>
+                    <button class="quick-cmd" data-cmd="Run a full system diagnostics report">🔍 Diagnostics</button>
+                    <button class="quick-cmd" data-cmd="What are all your capabilities?">📋 Capabilities</button>
+                    <button class="quick-cmd" data-cmd="Give me an inspiring motivational quote">💡 Quote</button>
+                    <button class="quick-cmd" data-cmd="Explain quantum computing in simple terms">🧠 Explain</button>
+                    <button class="quick-cmd" data-cmd="Write me a short poem about technology">✍️ Create</button>
+                    <button class="quick-cmd" data-cmd="What's happening in the world of AI lately?">🌐 AI News</button>
+                    <button class="quick-cmd" data-cmd="Help me brainstorm a startup idea">🚀 Ideas</button>
+                    <button class="quick-cmd" data-cmd="Give me a fun science fact">🔬 Science</button>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Bottom HUD Bar -->
+    <footer class="hud-bar bottom-bar" id="bottomBar">
+        <div class="bottom-left">
+            <span class="footer-label">ENCRYPTION: AES-256</span>
+            <div class="hud-divider"></div>
+            <span class="footer-label" id="modelLabel">MODEL: OFFLINE</span>
+        </div>
+        <div class="bottom-center">
+            <span class="footer-label" id="networkStatus">NETWORK: CHECKING</span>
+            <div class="hud-divider"></div>
+            <span class="footer-label">LATENCY: <span id="latencyValue">--</span>ms</span>
+        </div>
+        <div class="bottom-right">
+            <span class="footer-label">POWERED BY OLLAMA / CLAUDE + STARK TECH</span>
+            <div class="hud-divider"></div>
+            <span class="footer-label">v4.2.0</span>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

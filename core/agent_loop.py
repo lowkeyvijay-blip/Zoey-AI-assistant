@@ -6,6 +6,8 @@ from core.tool_manager import execute_tool
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "llama3.2:3b"
+KEEP_ALIVE = "30m"
+MAX_RESPONSE_TOKENS = 512
 
 
 TOOLS = """
@@ -324,7 +326,9 @@ class AgentLoop:
         payload_data = {
             "model": MODEL,
             "prompt": prompt,
-            "stream": False
+            "stream": False,
+            "keep_alive": KEEP_ALIVE,
+            "num_predict": MAX_RESPONSE_TOKENS,
         }
 
         if json_mode:

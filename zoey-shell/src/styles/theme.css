@@ -1,0 +1,30 @@
+:root {
+  --color-bg: #0a0b0d;
+  --color-surface: #101114;
+  --color-surface-raised: #16171b;
+  --color-border: #26282e;
+  --color-border-soft: #1c1d22;
+
+  --color-text-primary: #e8e9ec;
+  --color-text-secondary: #a8abb3;
+  --color-text-tertiary: #62676f;
+
+  --color-accent: #c9b3ff;
+  --color-accent-soft: #c9b3ff1a;
+
+  --color-emerald: #6fcf97;
+  --color-emerald-soft: #6fcf9714;
+  --color-amber: #d9a15b;
+  --color-amber-soft: #d9a15b14;
+  --color-rose: #e2685f;
+  --color-rose-soft: #e2685f14;
+  --color-blue: #8fa3ff;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise {
+  animation: rise 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}

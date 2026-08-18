@@ -13,6 +13,8 @@ from memory.memory import (
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "llama3.2:3b"
+KEEP_ALIVE = "30m"
+MAX_RESPONSE_TOKENS = 512
 
 
 class Zoey:
@@ -32,7 +34,9 @@ class Zoey:
         payload = json.dumps({
             "model": MODEL,
             "prompt": prompt,
-            "stream": False
+            "stream": False,
+            "keep_alive": KEEP_ALIVE,
+            "num_predict": MAX_RESPONSE_TOKENS,
         }).encode("utf-8")
 
         request = urllib.request.Request(
@@ -947,12 +951,22 @@ ZOEY:
     # MAIN RESPONSE LOOP
     # --------------------------------------------------
 
-    def respond(self, message: str):
+    def respond_structured(self, message: str):
+        """Route a message and return a structured result dict.
+
+        This mirrors respond() exactly but returns the raw dict the
+        orchestrator produced (plus a simple "text" result for plain
+        conversation) so the API layer can render rich cards. respond()
+        delegates here and formats the result as plain text.
+        """
 
         message = message.strip()
 
         if not message:
-            return "I'm listening."
+            return {
+                "type": "text",
+                "content": "I'm listening.",
+            }
 
         lower_message = message.lower()
 
@@ -964,13 +978,19 @@ ZOEY:
             information = message[9:].strip()
 
             if not information:
-                return "What should I remember?"
+                return {
+                    "type": "text",
+                    "content": "What should I remember?",
+                }
 
-            return self.remember(
-                information,
-                "note",
-                5
-            )
+            return {
+                "type": "text",
+                "content": self.remember(
+                    information,
+                    "note",
+                    5
+                ),
+            }
 
         # Recall command
         if lower_message in {
@@ -980,58 +1000,107 @@ ZOEY:
             "show my memories"
         }:
 
-            return self.recall()
+            return {
+                "type": "text",
+                "content": self.recall(),
+            }
 
         # Orchestrated routing
         result = self.orchestrator.handle(message)
 
-        if result.get("type") == "goal":
+        if result.get("type") in {
+            "goal",
+            "plan_pending",
+            "plan_executed",
+            "step_retried",
+            "execution_cancelled",
+            "execution_reset",
+            "execution_status",
+            "plan_list",
+            "plan_discarded",
+            "goal_rejected",
+            "error",
+        }:
+            return result
+
+        # Automatic memory detection: only for clearly memory-
+        # like messages. Skip for conversation/tool intents so
+        # those responses stay a single Ollama call.
+        intent = result.get("intent")
+
+        if intent == "memory":
+            memory = self.analyze_memory(
+                message
+            )
+
+            if memory:
+
+                self.remember(
+                    memory["content"],
+                    memory["type"],
+                    memory["importance"]
+                )
+
+        return {
+            "type": "text",
+            "content": self.ask_ai(message),
+        }
+
+    def format_result(self, result):
+        """Format a structured result as plain text.
+
+        This is the single dispatch used by respond(). Keeping it
+        separate lets the API layer attach the same text to rich cards.
+        """
+
+        result_type = result.get("type")
+
+        if result_type == "text":
+            return result.get("content", "")
+
+        if result_type == "goal":
             return self._format_goal_response(result)
 
-        if result.get("type") == "plan_pending":
+        if result_type == "plan_pending":
             return self._format_plan_pending_response(result)
 
-        if result.get("type") == "plan_executed":
+        if result_type == "plan_executed":
             return self._format_plan_execution_response(result)
 
-        if result.get("type") == "step_retried":
+        if result_type == "step_retried":
             return self._format_step_retried_response(result)
 
-        if result.get("type") == "execution_cancelled":
+        if result_type == "execution_cancelled":
             return self._format_execution_cancelled_response(result)
 
-        if result.get("type") == "execution_reset":
+        if result_type == "execution_reset":
             return self._format_execution_reset_response(result)
 
-        if result.get("type") == "execution_status":
+        if result_type == "execution_status":
             return self._format_execution_status_response(result)
 
-        if result.get("type") == "plan_list":
+        if result_type == "plan_list":
             return self._format_plan_list_response(result)
 
-        if result.get("type") == "plan_discarded":
+        if result_type == "plan_discarded":
             return self._format_plan_discarded_response(result)
 
-        if result.get("type") == "goal_rejected":
+        if result_type == "goal_rejected":
             return "OK, I won't add those tasks."
 
-        if result.get("type") == "error":
+        if result_type == "error":
             return result.get(
                 "error",
                 "I couldn't process that."
             )
 
-        # Automatic memory detection
-        memory = self.analyze_memory(
-            message
+        return result.get(
+            "content",
+            "I couldn't process that."
         )
 
-        if memory:
+    def respond(self, message: str):
 
-            self.remember(
-                memory["content"],
-                memory["type"],
-                memory["importance"]
-            )
+        result = self.respond_structured(message)
 
-        return self.ask_ai(message)
+        return self.format_result(result)
