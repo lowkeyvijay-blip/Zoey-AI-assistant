@@ -1,4 +1,4 @@
-"""Local FastAPI server connecting the zoey-shell frontend to Zoey.
+"""Local FastAPI server connecting the jarvis-ai frontend to Zoey.
 
 Phase 10.9 integration. Design notes:
 
@@ -364,10 +364,18 @@ app = create_app()
 
 
 if __name__ == "__main__":
+    import sys
     import uvicorn
 
-    uvicorn.run(
-        "api.server:app",
-        host=settings.API_HOST,
-        port=settings.API_PORT,
-    )
+    if getattr(sys, "frozen", False):
+        uvicorn.run(
+            app,
+            host=settings.API_HOST,
+            port=settings.API_PORT,
+        )
+    else:
+        uvicorn.run(
+            "api.server:app",
+            host=settings.API_HOST,
+            port=settings.API_PORT,
+        )

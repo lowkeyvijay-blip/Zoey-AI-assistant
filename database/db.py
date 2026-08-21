@@ -1,10 +1,16 @@
+import os
 import sqlite3
 from pathlib import Path
 
 from config.settings import ensure_files_root
 
 
-DB_PATH = Path(__file__).resolve().parent / "zoey.db"
+_DB_DIR_OVERRIDE = os.environ.get("ZOEY_DB_DIR")
+
+if _DB_DIR_OVERRIDE:
+    DB_PATH = Path(_DB_DIR_OVERRIDE) / "zoey.db"
+else:
+    DB_PATH = Path(__file__).resolve().parent / "zoey.db"
 
 
 def get_connection():

@@ -1,1 +1,29 @@
 jarvis-ai/app.js
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Electron build output
+zoey-shell/release/
+zoey-shell/dist/
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+build/
+dist/
+
+__pycache__/
+*.pyc
+*.db
+node_modules/
