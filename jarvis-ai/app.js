@@ -1,6 +1,6 @@
 /* ===========================
-   J.A.R.V.I.S. v4 — Core AI System
-   Powered by Gemini (Google)
+   J.A.R.V.I.S. v4 — Zoey Frontend
+   Powered by the local Zoey backend
    =========================== */
 
 (function () {
@@ -13,32 +13,6 @@
         particleCount: 60,
         waveformBars: 44,
         maxConversationHistory: 30,
-        geminiApiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/',
-        systemPrompt: `You are J.A.R.V.I.S. (Just A Rather Very Intelligent System), the legendary AI assistant created by Tony Stark in the Iron Man universe. You are now serving a new user with the same level of intelligence, wit, and sophistication.
-
-Your personality:
-- Highly intelligent, articulate, and professional
-- Dry British wit — subtle humor, never forced
-- Respectful — you call the user "sir" or "ma'am" occasionally (not every message)
-- Confident but not arrogant
-- Proactive — you anticipate needs and offer suggestions
-- Concise — you give clear, direct answers without unnecessary verbosity
-
-Key behaviors:
-- Always provide accurate, helpful information
-- When asked about time/date, use the current time provided in the system context
-- For calculations, show your work briefly
-- For code questions, provide clean, well-commented code
-- Reference Stark Industries, the Avengers, or Iron Man lore naturally when appropriate
-- If you don't know something, say so honestly — don't make things up
-- Format responses cleanly — use line breaks for readability
-- Keep responses focused and not overly long unless detail is requested
-
-Current context:
-- Current date and time: {{DATETIME}}
-- You are running as a web-based AI assistant interface
-- You have voice input/output capabilities
-- The user can see a futuristic HUD interface around the chat`,
     };
 
     // ===========================
@@ -80,7 +54,7 @@ Current context:
         memoryBar: $('#memoryBar'),
         aiEngineStatus: $('#aiEngineStatus'),
         aiEngineBar: $('#aiEngineBar'),
-        claudeProcess: $('#claudeProcess'),
+        zoeyProcess: $('#zoeyProcess'),
         clearChatBtn: $('#clearChatBtn'),
 
         // Settings
@@ -89,10 +63,7 @@ Current context:
         settingsClose: $('#settingsClose'),
         settingsSaveBtn: $('#settingsSaveBtn'),
         settingsCancelBtn: $('#settingsCancelBtn'),
-        apiKeyInput: $('#apiKeyInput'),
         apiStatus: $('#apiStatus'),
-        toggleKeyVisibility: $('#toggleKeyVisibility'),
-        modelSelect: $('#modelSelect'),
         voiceSelect: $('#voiceSelect'),
         voiceRate: $('#voiceRate'),
         voiceRateValue: $('#voiceRateValue'),
@@ -111,12 +82,7 @@ Current context:
     // ===========================
     // Application State
     // ===========================
-    let savedModel = localStorage.getItem('jarvis_model');
-    if (!savedModel || savedModel.includes('1.5')) savedModel = 'gemini-2.5-flash';
-
     const state = {
-        apiKey: localStorage.getItem('jarvis_api_key') || '',
-        model: savedModel,
         isProcessing: false,
         isListening: false,
         isSpeaking: false,
@@ -378,12 +344,6 @@ Current context:
             if (e.target === DOM.settingsOverlay) closeSettings();
         });
 
-        // Toggle API key visibility
-        DOM.toggleKeyVisibility.addEventListener('click', () => {
-            const input = DOM.apiKeyInput;
-            input.type = input.type === 'password' ? 'text' : 'password';
-        });
-
         // Voice settings sliders
         DOM.voiceRate.addEventListener('input', () => {
             DOM.voiceRateValue.textContent = DOM.voiceRate.value + 'x';
@@ -409,8 +369,6 @@ Current context:
     // Settings
     // ===========================
     function openSettings() {
-        DOM.apiKeyInput.value = state.apiKey;
-        DOM.modelSelect.value = state.model;
         DOM.autoSpeak.checked = state.settings.autoSpeak;
         DOM.continuousListen.checked = state.settings.continuousListen;
         DOM.voiceRate.value = state.settings.voiceRate;
@@ -426,10 +384,6 @@ Current context:
     }
 
     function saveSettings() {
-        const newKey = DOM.apiKeyInput.value.trim();
-
-        state.apiKey = newKey;
-        state.model = DOM.modelSelect.value;
         state.settings.autoSpeak = DOM.autoSpeak.checked;
         state.settings.continuousListen = DOM.continuousListen.checked;
         state.settings.voiceRate = parseFloat(DOM.voiceRate.value);
@@ -439,8 +393,6 @@ Current context:
         state.settings.voiceName = selectedVoiceOption;
 
         // Persist
-        localStorage.setItem('jarvis_api_key', state.apiKey);
-        localStorage.setItem('jarvis_model', state.model);
         localStorage.setItem('jarvis_autospeak', state.settings.autoSpeak);
         localStorage.setItem('jarvis_continuous', state.settings.continuousListen);
         localStorage.setItem('jarvis_voice_rate', state.settings.voiceRate);
@@ -488,7 +440,7 @@ Current context:
             text.textContent = 'Connected to Zoey backend ✓';
             DOM.aiEngineStatus.textContent = 'ONLINE';
             DOM.aiEngineBar.style.setProperty('--fill-width', '100%');
-            DOM.claudeProcess.classList.add('active');
+            DOM.zoeyProcess.classList.add('active');
             DOM.modelLabel.textContent = 'MODEL: ZOEY';
             DOM.aiBadge.textContent = 'ZOEY ONLINE';
             DOM.aiBadge.classList.add('online');
@@ -497,7 +449,7 @@ Current context:
             text.textContent = 'Backend offline — using offline mode';
             DOM.aiEngineStatus.textContent = 'OFFLINE';
             DOM.aiEngineBar.style.setProperty('--fill-width', '0%');
-            DOM.claudeProcess.classList.remove('active');
+            DOM.zoeyProcess.classList.remove('active');
             DOM.modelLabel.textContent = 'MODEL: OFFLINE';
             DOM.aiBadge.textContent = 'OFFLINE MODE';
             DOM.aiBadge.classList.remove('online');
@@ -1649,16 +1601,6 @@ Current context:
     // ===========================
     // Offline AI (Fallback)
     // ===========================
-    function generateOfflineResponse(userText) {
-        setTimeout(() => {
-            const response = generateOfflineText(userText);
-            addJarvisMessage(response, true);
-            state.isProcessing = false;
-            setReactorState('standby');
-            addActivityLog('Offline response generated');
-        }, 600 + Math.random() * 800);
-    }
-
     function generateOfflineText(input) {
         const lower = input.toLowerCase().trim();
 
@@ -1691,7 +1633,7 @@ Current context:
 
         // Capabilities
         if (/\b(can you do|capabilit|help|feature|command|what do you)\b/.test(lower)) {
-            return `Currently in offline mode, my capabilities include:\n\n• 🕐 Time & Date — real-time clock\n• 🧮 Basic calculations\n• 😄 Jokes and fun facts\n• 💡 Motivational quotes\n• 🎤 Voice input/output\n\nFor my full capabilities powered by Gemini AI — including coding help, research, analysis, creative writing, and much more — add your Google Gemini API key in the ⚙ settings.`;
+            return `Currently in offline mode, my capabilities include:\n\n• 🕐 Time & Date — real-time clock\n• 😄 Jokes and fun facts\n• 💡 Motivational quotes\n• 🎤 Voice input/output\n\nFor my full capabilities — planning, tasks, memory, files, calendar, app control and more — make sure the Zoey backend is running and serving this page.`;
         }
 
         // Joke
@@ -1729,31 +1671,21 @@ Current context:
 
         // Calculation
         if (/[\d+\-*/^%()]/.test(lower) && /\b(calc|compute|solve|what\s+is|equals)\b/.test(lower)) {
-            try {
-                const expr = input.replace(/[^0-9+\-*/().%\s]/g, ' ').replace(/\^/g, '**').trim();
-                const sanitized = expr.replace(/[^0-9+\-*/().%\s]/g, '');
-                if (sanitized.trim()) {
-                    const result = Function('"use strict"; return (' + sanitized + ')')();
-                    if (typeof result === 'number' && isFinite(result)) {
-                        return `The result is ${result}.`;
-                    }
-                }
-            } catch (e) { /* fall through */ }
-            return "I had trouble parsing that equation. Could you rephrase it?";
+            return "I can calculate that once my Zoey backend core is online. Please start the backend and ask again.";
         }
 
         // Diagnostics
         if (/\b(diagnostic|system|status|health)\b/.test(lower)) {
             addActivityLog('Running diagnostics...', 'warning');
             setTimeout(() => addActivityLog('Diagnostics complete ✓', 'success'), 1000);
-            return `Running full system diagnostics...\n\n✅ Neural Network — Operational\n✅ Voice Module — Active\n✅ Speech Synthesis — Online\n✅ HUD Renderer — Nominal\n✅ Security — AES-256 Active\n${state.apiKey ? '✅ Gemini AI — Connected' : '⚠️ Gemini AI — Not configured'}\n\nAll core systems operating within normal parameters.`;
+            return `Running full system diagnostics...\n\n✅ Neural Network — Operational\n✅ Voice Module — Active\n✅ Speech Synthesis — Online\n✅ HUD Renderer — Nominal\n✅ Security — AES-256 Active\n${state.backendOnline ? '✅ Zoey Core — Connected' : '⚠️ Zoey Core — Offline'}\n\nAll core systems operating within normal parameters.`;
         }
 
         // Default
         return pick([
-            `I'm currently in offline mode with limited capabilities. To get a complete answer to your query, configure your Gemini AI API key in the ⚙ settings — then I'll be able to help with virtually anything.`,
-            `That's a great question, but I'd need my Gemini AI core online to give you a proper answer. Click the ⚙ icon to add your API key and unlock my full potential.`,
-            `I wish I could help more with that in offline mode. Add your Google Gemini API key in settings to connect me to Gemini AI — then I'll have the intelligence to handle any request.`,
+            `I'm currently in offline mode with limited capabilities. To get a complete answer to your query, make sure the Zoey backend is running and serving this page.`,
+            `That's a great question, but I'd need my Zoey core online to give you a proper answer. Please check that the backend is running, then try again.`,
+            `I wish I could help more with that in offline mode. Once the Zoey backend is running, I'll have the intelligence to handle any request.`,
         ]);
     }
 

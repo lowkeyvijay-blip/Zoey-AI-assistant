@@ -170,25 +170,6 @@ a:hover { text-decoration: underline; }
     color: var(--text-dim); margin-bottom: 0.75rem; line-height: 1.5;
 }
 
-.api-key-wrapper {
-    display: flex; gap: 0.5rem;
-}
-.api-key-wrapper input {
-    flex: 1; background: var(--bg-input); border: 1px solid var(--border);
-    border-radius: 8px; padding: 0.6rem 0.8rem;
-    color: var(--text-primary); font-family: var(--font-mono); font-size: 0.8rem;
-    outline: none; transition: border-color var(--transition-normal);
-}
-.api-key-wrapper input:focus { border-color: var(--primary); box-shadow: var(--glow-sm); }
-.api-key-wrapper input::placeholder { color: var(--text-dim); }
-
-.toggle-visibility {
-    background: var(--bg-input); border: 1px solid var(--border);
-    border-radius: 8px; padding: 0 0.6rem; cursor: pointer;
-    color: var(--text-dim); transition: all var(--transition-fast);
-}
-.toggle-visibility:hover { color: var(--primary); border-color: var(--primary); }
-
 .api-status {
     display: flex; align-items: center; gap: 0.5rem;
     margin-top: 0.5rem; font-family: var(--font-mono); font-size: 0.6rem;

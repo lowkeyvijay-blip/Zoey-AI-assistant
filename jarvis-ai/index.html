@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="J.A.R.V.I.S. — AI Assistant powered by Claude. Voice-enabled, futuristic HUD interface.">
+    <meta name="description" content="J.A.R.V.I.S. — AI Assistant powered by Zoey local AI. Voice-enabled, futuristic HUD interface.">
     <title>J.A.R.V.I.S. — AI Assistant</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,35 +32,15 @@
             </div>
             <div class="modal-body">
                 <div class="setting-group">
-                    <label class="setting-label" for="apiKeyInput">
-                        <span class="label-icon">🔑</span>
-                        GEMINI API KEY
+                    <label class="setting-label">
+                        <span class="label-icon">🔗</span>
+                        ZOEY BACKEND
                     </label>
-                    <p class="setting-desc">Enter your Gemini API key to enable AI-powered responses. Get one free at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a></p>
-                    <div class="api-key-wrapper">
-                        <input type="password" id="apiKeyInput" placeholder="AIzaSy..." autocomplete="off" spellcheck="false">
-                        <button class="toggle-visibility" id="toggleKeyVisibility" title="Show/hide key">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                        </button>
-                    </div>
+                    <p class="setting-desc">Zoey runs fully local — the backend core serves this page and powers all responses.</p>
                     <div class="api-status" id="apiStatus">
                         <span class="api-dot"></span>
-                        <span class="api-text">No API key configured — using offline mode</span>
+                        <span class="api-text">Checking Zoey backend connection...</span>
                     </div>
-                </div>
-                <div class="setting-group">
-                    <label class="setting-label">
-                        <span class="label-icon">🤖</span>
-                        AI MODEL
-                    </label>
-                    <select id="modelSelect" class="setting-select">
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fastest & Recommended)</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Most Capable)</option>
-                        <option value="gemini-3.0-flash">Gemini 3.0 Flash (Latest)</option>
-                    </select>
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">
@@ -194,9 +174,9 @@
                         <span class="proc-dot"></span>
                         <span class="proc-name">speech_recognition.sys</span>
                     </div>
-                    <div class="process-item" id="claudeProcess">
+                    <div class="process-item" id="zoeyProcess">
                         <span class="proc-dot"></span>
-                        <span class="proc-name">gemini_ai.engine</span>
+                        <span class="proc-name">zoey_core.ai</span>
                     </div>
                     <div class="process-item active">
                         <span class="proc-dot"></span>
@@ -355,7 +335,7 @@
             <span class="footer-label">LATENCY: <span id="latencyValue">--</span>ms</span>
         </div>
         <div class="bottom-right">
-            <span class="footer-label">POWERED BY GEMINI AI + STARK TECH</span>
+            <span class="footer-label">POWERED BY ZOEY LOCAL AI + STARK TECH</span>
             <div class="hud-divider"></div>
             <span class="footer-label">v4.2.0</span>
         </div>
