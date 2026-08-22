@@ -115,7 +115,7 @@ Current context:
     if (!savedModel || savedModel.includes('1.5')) savedModel = 'gemini-2.5-flash';
 
     const state = {
-        apiKey: '***REDACTED***',
+        apiKey: localStorage.getItem('jarvis_api_key') || '',
         model: savedModel,
         isProcessing: false,
         isListening: false,

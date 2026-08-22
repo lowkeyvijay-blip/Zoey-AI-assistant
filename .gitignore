@@ -20,6 +20,11 @@ zoey-shell/dist/
 # Node
 node_modules/
 
+# Secrets / local config - never commit
+.env
+*.env
+jarvis-ai/config.local.js
+
 # IDE
 .vscode/
 .idea/
