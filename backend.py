@@ -19,10 +19,8 @@ def _setup_frozen_paths():
 
     # User-writable data: %APPDATA%/Zoey/  (or ZOEY_DATA_DIR override)
     user_data = Path(
-        os.environ.get(
-            "ZOEY_DATA_DIR",
-            os.path.join(os.environ.get("APPDATA", ""), "Zoey"),
-        )
+        os.environ.get("ZOEY_DATA_DIR")
+        or Path(os.environ.get("APPDATA") or Path.home()) / "Zoey"
     )
     user_data.mkdir(parents=True, exist_ok=True)
 

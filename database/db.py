@@ -1,19 +1,30 @@
 import os
 import sqlite3
+import sys
 from pathlib import Path
 
+from config import settings
 from config.settings import ensure_files_root
 
 
 _DB_DIR_OVERRIDE = os.environ.get("ZOEY_DB_DIR")
 
 if _DB_DIR_OVERRIDE:
-    DB_PATH = Path(_DB_DIR_OVERRIDE) / "zoey.db"
+    # Explicit override (set by backend.py for frozen builds, or by
+    # tests/tools).
+    DB_DIR = Path(_DB_DIR_OVERRIDE)
+elif getattr(sys, "frozen", False):
+    # Safety net: never write into the read-only PyInstaller bundle.
+    DB_DIR = settings.DATA_DIR / "db"
 else:
-    DB_PATH = Path(__file__).resolve().parent / "zoey.db"
+    DB_DIR = Path(__file__).resolve().parent
+
+
+DB_PATH = DB_DIR / "zoey.db"
 
 
 def get_connection():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     return connection

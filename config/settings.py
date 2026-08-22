@@ -15,15 +15,25 @@ _IS_FROZEN = getattr(sys, "frozen", False)
 
 if _IS_FROZEN:
     _EXE_DIR = Path(sys.executable).resolve().parent
+    # PyInstaller 6+ onedir bundles datas under <exe>/_internal/;
+    # sys._MEIPASS covers that plus onefile and older layouts.
+    if hasattr(sys, "_MEIPASS"):
+        _BUNDLE_DIR = Path(sys._MEIPASS)
+    else:
+        _BUNDLE_DIR = _EXE_DIR / "_internal"
     _USER_DATA = Path(
-        os.environ.get(
-            "ZOEY_DATA_DIR",
-            os.path.join(os.environ.get("APPDATA", ""), "Zoey"),
-        )
+        os.environ.get("ZOEY_DATA_DIR")
+        or Path(os.environ.get("APPDATA") or Path.home()) / "Zoey"
     )
 else:
     _EXE_DIR = None
+    _BUNDLE_DIR = None
     _USER_DATA = None
+
+# User-writable root for persistent runtime data.  Frozen builds keep
+# the database and file sandbox here (%APPDATA%/Zoey by default); in
+# dev everything stays inside the repo.
+DATA_DIR = _USER_DATA if _IS_FROZEN else BASE_DIR
 
 
 # Phase 10.3: sandbox root for Zoey's file tools.
@@ -43,7 +53,7 @@ _FRONTEND_DIR_OVERRIDE = os.environ.get("ZOEY_FRONTEND_DIR")
 if _FRONTEND_DIR_OVERRIDE:
     JARVIS_APP_DIR = Path(_FRONTEND_DIR_OVERRIDE)
 elif _IS_FROZEN:
-    JARVIS_APP_DIR = _EXE_DIR / "_internal" / "frontend_dist"
+    JARVIS_APP_DIR = _BUNDLE_DIR / "frontend_dist"
 else:
     JARVIS_APP_DIR = _JARVIS_APP_DIR
 

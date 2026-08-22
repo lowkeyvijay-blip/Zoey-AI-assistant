@@ -1,9 +1,17 @@
-jarvis-ai/app.js
-
 # Python
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# SQLite runtime data (dev DB lives in database/, packaged in %APPDATA%/Zoey)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# PyInstaller build output
+build/
+dist/
 
 # Electron build output
 zoey-shell/release/
@@ -19,11 +27,3 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
-
-build/
-dist/
-
-__pycache__/
-*.pyc
-*.db
-node_modules/

@@ -1,4 +1,5 @@
 import io
+import re
 import sys
 from unittest.mock import patch
 
@@ -97,8 +98,9 @@ def test_tool_sync_and_validation():
     assert "fetch_url" in TOOLS
     assert "open_url" in ALLOWED_TOOLS
     assert "fetch_url" in ALLOWED_TOOLS
-    assert "21. open_url" in TOOL_DOC
-    assert "22. fetch_url" in TOOL_DOC
+    assert re.search(r"(?m)^\d+\. open_url$", TOOL_DOC)
+    assert re.search(r"(?m)^\d+\. fetch_url$", TOOL_DOC)
+    assert TOOL_DOC.index("open_url") < TOOL_DOC.index("fetch_url")
 
     valid = validate_step({"tool": "fetch_url", "arguments": {"url": "https://example.com", "max_chars": 100}})
     assert valid["valid"] is True

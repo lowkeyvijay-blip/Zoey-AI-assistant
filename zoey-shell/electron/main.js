@@ -6,6 +6,7 @@ const fs = require("fs");
 
 let mainWindow = null;
 let backendProcess = null;
+let backendHealthy = false;
 
 const BACKEND_PORT = parseInt(process.env.ZOEY_BACKEND_PORT || "8000", 10);
 const BACKEND_HOST = "127.0.0.1";
@@ -45,8 +46,13 @@ function createWindow() {
   if (isDev()) {
     mainWindow.loadURL("http://localhost:5173");
     mainWindow.webContents.openDevTools({ mode: "detach" });
-  } else {
+  } else if (backendHealthy) {
     mainWindow.loadURL(getBackendUrl());
+  } else {
+    showBackendError(
+      `The backend did not become healthy within ${HEALTH_TIMEOUT / 1000} seconds.\n` +
+      "Check the console output and restart Zoey."
+    );
   }
 
   mainWindow.on("closed", () => {
@@ -92,7 +98,7 @@ function startBackend() {
 
   if (isDev()) {
     console.log("[Zoey] Starting Python backend (dev mode)");
-    const repoRoot = path.resolve(__dirname, "..", "..");
+    const repoRoot = path.resolve(__dirname, "..", "..", "..");
 
     backendProcess = spawn("python", ["-m", "api.server"], {
       cwd: repoRoot,
@@ -179,22 +185,21 @@ ipcMain.handle("get-backend-url", () => getBackendUrl());
 
 // App lifecycle
 app.whenReady().then(async () => {
-  if (isDev()) {
-    console.log("[Zoey] Development mode");
-    createWindow();
-  } else {
-    console.log("[Zoey] Production mode");
-    startBackend();
+  // Both modes start the local backend first, wait for /api/health,
+  // then open the window (dev loads the Vite dev server, production
+  // loads the backend's same-origin UI).
+  console.log(isDev() ? "[Zoey] Development mode" : "[Zoey] Production mode");
+  startBackend();
 
-    try {
-      await waitForBackend();
-      console.log("[Zoey] Backend is healthy");
-    } catch (err) {
-      console.error("[Zoey]", err.message);
-    }
-
-    createWindow();
+  try {
+    await waitForBackend();
+    backendHealthy = true;
+    console.log("[Zoey] Backend is healthy");
+  } catch (err) {
+    console.error("[Zoey]", err.message);
   }
+
+  createWindow();
 });
 
 app.on("window-all-closed", () => {

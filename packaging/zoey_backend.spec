@@ -5,7 +5,8 @@ Build with:
     cd C:\\Zoey-ai
     pyinstaller packaging\\zoey_backend.spec
 
-Output: packaging\\dist\\ZoeyBackend.exe
+Output: dist\\ZoeyBackend\\  (onedir; consumed by electron-builder's
+extraResources mapping ../dist/ZoeyBackend -> backend/ZoeyBackend)
 """
 
 import os
