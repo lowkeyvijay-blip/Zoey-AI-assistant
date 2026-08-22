@@ -279,6 +279,25 @@ Arguments:
 {
     "limit": integer or omit
 }
+
+30. calculate
+    Purpose: Evaluate arithmetic EXACTLY and deterministically.
+    ALWAYS use this for any math (percentages, division,
+    currency amounts, comparisons). NEVER do arithmetic
+    yourself - state the calculator's result instead.
+
+Arguments:
+{
+    "expression": "arithmetic expression, e.g. 2500000 / 85000"
+}
+
+31. current_time
+    Purpose: Get the REAL current date and time from the
+    system clock. Use for any 'now', 'today', or deadline
+    question. Never guess the date yourself.
+
+Arguments:
+{}
 """
 
 
@@ -312,6 +331,8 @@ ALLOWED_TOOLS = {
     "fetch_url",
     "notify",
     "notifications_log",
+    "calculate",
+    "current_time",
 }
 
 
@@ -362,8 +383,21 @@ class AgentLoop:
 
     def decide(self, user_message: str):
 
+        try:
+            from tools.clock import current_time
+            clock = current_time()
+            clock_line = (
+                f"{clock['weekday']}, {clock['date']} "
+                f"{clock['time']} ({clock['timezone']})"
+            )
+        except Exception:
+            clock_line = "unavailable"
+
         prompt = f"""
 You are Zoey, a personal AI assistant.
+
+CURRENT DATE/TIME (from the system clock - always trust this,
+never guess dates): {clock_line}
 
 {TOOLS}
 
@@ -375,6 +409,19 @@ A user request may require ZERO, ONE, or MULTIPLE tools.
 
 If multiple actions are requested, return ALL required
 tool calls in the correct order.
+
+CRITICAL ACCURACY RULES:
+
+- For ANY arithmetic (sums, percentages, currency amounts,
+  division), call "calculate" with an expression. NEVER
+  compute numbers yourself and never state a number you
+  did not get from the calculator.
+- For ANY question about the current date or time, call
+  "current_time". NEVER invent a date.
+- If the user asks to OPEN something AND calculate, return
+  BOTH tool calls in order.
+- If the request is only a math question, one
+  "calculate" call is enough.
 
 Examples:
 
@@ -627,6 +674,45 @@ USER:
     # FINAL RESPONSE
     # --------------------------------------------------
 
+    def _deterministic_summary(self, tool_results):
+        """Build the reply directly from deterministic tool
+        messages when every result carries one.
+
+        Tools like open_app/close_app/current_time return a
+        fixed, factual "message". Summarizing them needs no
+        reasoning, so the extra LLM call is avoided. Any
+        result without a plain message (lists, numbers,
+        explanations) falls back to the LLM response path."""
+
+        if not isinstance(tool_results, list) or not tool_results:
+            return None
+
+        messages = []
+
+        for item in tool_results:
+
+            if not isinstance(item, dict):
+                return None
+
+            result = item.get("result")
+
+            if not isinstance(result, dict):
+                return None
+
+            message = result.get("message")
+
+            if not isinstance(message, str):
+                return None
+
+            message = message.strip()
+
+            if not message:
+                return None
+
+            messages.append(message)
+
+        return "\n".join(messages)
+
     def respond_after_tools(
         self,
         user_message,
@@ -702,6 +788,19 @@ IMPORTANT:
                     "The action failed: "
                     + self._format_errors(execution)
                 )
+            }
+
+        # Deterministic tool results (open/close app, system
+        # clock) already carry the exact answer, so the extra
+        # summarization LLM call is skipped when possible.
+        summary = self._deterministic_summary(
+            execution["results"]
+        )
+
+        if summary is not None:
+            return {
+                "type": "response",
+                "content": summary,
             }
 
         # --------------------------------------------------

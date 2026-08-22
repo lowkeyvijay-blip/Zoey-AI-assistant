@@ -127,6 +127,10 @@ TOOL_ARGUMENT_RULES = {
     "notifications_log": {
         "limit": {"types": (int,), "required": False},
     },
+    "calculate": {
+        "expression": {"types": (str,), "required": True},
+    },
+    "current_time": {},
 }
 
 

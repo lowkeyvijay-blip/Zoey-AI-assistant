@@ -1,7 +1,11 @@
 import json
+import re
 import urllib.request
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 
 from database.db import initialize_database
+from core.agent_loop import AgentLoop
 from core.orchestrator import Orchestrator
 from memory.memory import (
     remember,
@@ -9,12 +13,35 @@ from memory.memory import (
     get_by_type,
     search_memories,
 )
+from tools.calculator import (
+    calculate,
+    format_number,
+)
+from tools.clock import current_time
 
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "llama3.2:3b"
 KEEP_ALIVE = "30m"
 MAX_RESPONSE_TOKENS = 512
+
+HISTORY_TURNS = 6
+MAX_HISTORY_CHARS = 600
+
+# Questions answered directly from the OS clock.
+_TIME_PATTERNS = (
+    r"what(?:'| i)?s the time",
+    r"what time is it",
+    r"current time",
+    r"time (?:right )?now",
+    r"what(?:'| i)?s the date",
+    r"what is the date",
+    r"whats the date",
+    r"(?:what|which) day is it",
+    r"what day is today",
+    r"today'?s date",
+    r"date today",
+)
 
 
 class Zoey:
@@ -24,6 +51,15 @@ class Zoey:
         self.orchestrator = (
             orchestrator if orchestrator is not None else Orchestrator()
         )
+        self.agent_loop = AgentLoop()
+
+        # Recent conversation for follow-up context ("you messed
+        # up that calculation"). Newest entry last.
+        self._history = deque(maxlen=HISTORY_TURNS * 2)
+
+        # Last deterministic calculation, so a follow-up like
+        # "that math is wrong" can be grounded in exact numbers.
+        self._last_calculation = None
 
     # --------------------------------------------------
     # BASIC AI
@@ -560,6 +596,33 @@ RELEVANT MEMORIES:
 None.
 """.strip()
 
+        history_block = self._history_block()
+
+        if history_block:
+            history_context = f"""
+RECENT CONVERSATION (oldest first):
+
+{history_block}
+""".strip()
+
+        else:
+            history_context = ""
+
+        clock_context = self._clock_block()
+
+        calculation_context = self._last_calculation_block()
+
+        context_sections = "\n\n".join(
+            section
+            for section in (
+                memory_context,
+                history_context,
+                clock_context,
+                calculation_context,
+            )
+            if section
+        )
+
         prompt = f"""
 You are Zoey, the user's personal AI assistant.
 
@@ -584,6 +647,12 @@ BEHAVIOR:
 IMPORTANT:
 
 - Use relevant memories when they help answer the user.
+- Use the recent conversation to resolve follow-up
+  messages like "yes", "what about tomorrow", or
+  "you messed up that calculation".
+- If the last calculation shown below conflicts with
+  something said in the conversation, trust the LAST
+  CALCULATION line - it is exact.
 - Do not mention the memory system unless asked.
 - Never invent personal facts.
 - Never assume a memory is relevant when it isn't.
@@ -592,7 +661,7 @@ IMPORTANT:
 - Never claim to have performed an action unless
   a real tool performed it.
 
-{memory_context}
+{context_sections}
 
 USER:
 {message}
@@ -948,6 +1017,106 @@ ZOEY:
         return "OK, there's nothing to discard now."
 
     # --------------------------------------------------
+    # HISTORY + DETERMINISTIC FAST PATHS
+    # --------------------------------------------------
+
+    def _record_turn(self, message: str, reply: str):
+        self._history.append(("USER", message))
+        self._history.append(("ZOEY", reply))
+
+    def _history_block(self) -> str:
+
+        if not self._history:
+            return ""
+
+        lines = []
+
+        for speaker, text in self._history:
+
+            snippet = " ".join(text.split())
+
+            if len(snippet) > MAX_HISTORY_CHARS:
+                snippet = snippet[:MAX_HISTORY_CHARS] + "..."
+
+            lines.append(f"{speaker}: {snippet}")
+
+        return "\n".join(lines)
+
+    def _try_calculate_fast_path(self, message: str):
+
+        # Pure arithmetic is answered exactly, with zero LLM
+        # calls. Anything with letters (other than question
+        # wrappers like "what is") never reaches here.
+        if not re.search(r"\d", message):
+            return None
+
+        if not re.search(r"[+\-*/^×÷]", message):
+            return None
+
+        try:
+            result = calculate(message)
+        except ValueError:
+            return None
+        except Exception:
+            return None
+
+        formatted = format_number(result["result"])
+
+        self._last_calculation = {
+            "expression": result["expression"],
+            "result": result["result"],
+            "formatted": formatted,
+        }
+
+        return (
+            f"{result['expression']} = "
+            f"{formatted}"
+        )
+
+    def _try_time_fast_path(self, message: str):
+
+        lower_message = message.lower().strip(" ?!.")
+
+        for pattern in _TIME_PATTERNS:
+
+            if re.search(pattern, lower_message):
+                break
+
+        else:
+            return None
+
+        clock = current_time()
+
+        return clock["message"]
+
+    def _clock_block(self) -> str:
+
+        try:
+            clock = current_time()
+        except Exception:
+            return ""
+
+        return (
+            f"CURRENT DATE/TIME (from the system clock - "
+            f"trust this): {clock['weekday']}, "
+            f"{clock['date']} {clock['time']} "
+            f"({clock['timezone']})"
+        )
+
+    def _last_calculation_block(self) -> str:
+
+        last = self._last_calculation
+
+        if not last:
+            return ""
+
+        return (
+            "LAST CALCULATION YOU PERFORMED (exact and "
+            f"verified): {last['expression']} = "
+            f"{last['formatted']}"
+        )
+
+    # --------------------------------------------------
     # MAIN RESPONSE LOOP
     # --------------------------------------------------
 
@@ -983,13 +1152,17 @@ ZOEY:
                     "content": "What should I remember?",
                 }
 
+            reply = self.remember(
+                information,
+                "note",
+                5
+            )
+
+            self._record_turn(message, reply)
+
             return {
                 "type": "text",
-                "content": self.remember(
-                    information,
-                    "note",
-                    5
-                ),
+                "content": reply,
             }
 
         # Recall command
@@ -1000,9 +1173,34 @@ ZOEY:
             "show my memories"
         }:
 
+            reply = self.recall()
+
+            self._record_turn(message, reply)
+
             return {
                 "type": "text",
-                "content": self.recall(),
+                "content": reply,
+            }
+
+        # Deterministic fast paths: arithmetic and clock
+        # questions are answered exactly, with zero LLM calls.
+        fast_reply = self._try_calculate_fast_path(
+            message
+        )
+
+        if fast_reply is None:
+
+            fast_reply = self._try_time_fast_path(
+                message
+            )
+
+        if fast_reply is not None:
+
+            self._record_turn(message, fast_reply)
+
+            return {
+                "type": "text",
+                "content": fast_reply,
             }
 
         # Orchestrated routing
@@ -1021,17 +1219,41 @@ ZOEY:
             "goal_rejected",
             "error",
         }:
+            self._record_turn(
+                message,
+                self.format_result(result)
+            )
             return result
 
         # Automatic memory detection: only for clearly memory-
-        # like messages. Skip for conversation/tool intents so
-        # those responses stay a single Ollama call.
+        # like messages. Memory analysis runs in parallel with
+        # the response LLM call so it adds no latency.
         intent = result.get("intent")
 
+        if intent == "tool":
+            # Real action/tool execution through the agent loop.
+            loop_result = self.agent_loop.run(message)
+
+            reply = loop_result.get("content", "")
+
+            self._record_turn(message, reply)
+
+            return {
+                "type": "text",
+                "content": reply,
+            }
+
         if intent == "memory":
-            memory = self.analyze_memory(
-                message
-            )
+
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                memory_future = executor.submit(
+                    self.analyze_memory,
+                    message,
+                )
+
+                response_text = self.ask_ai(message)
+
+                memory = memory_future.result()
 
             if memory:
 
@@ -1041,9 +1263,14 @@ ZOEY:
                     memory["importance"]
                 )
 
+        else:
+            response_text = self.ask_ai(message)
+
+        self._record_turn(message, response_text)
+
         return {
             "type": "text",
-            "content": self.ask_ai(message),
+            "content": response_text,
         }
 
     def format_result(self, result):

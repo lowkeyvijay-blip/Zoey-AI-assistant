@@ -35,6 +35,8 @@ from tools.files import (
 )
 from tools.browser import open_url, fetch_url
 from tools.notifications import notify, notifications_log
+from tools.calculator import calculate
+from tools.clock import current_time
 
 
 TOOLS = {
@@ -67,6 +69,8 @@ TOOLS = {
     "fetch_url": fetch_url,
     "notify": notify,
     "notifications_log": notifications_log,
+    "calculate": calculate,
+    "current_time": current_time,
 }
 
 

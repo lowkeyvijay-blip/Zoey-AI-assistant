@@ -3,9 +3,11 @@
 These tests never hit the network: the orchestrator is stubbed and
 the LLM methods are monkeypatched. They verify the latency fixes:
 
-1. conversation/tool intents skip analyze_memory() (single LLM call)
-2. memory intents still run memory detection
-3. every generation payload carries keep_alive + num_predict
+1. conversation intents skip analyze_memory() (single LLM call)
+2. memory intents still run memory detection (in parallel)
+3. tool intents are executed by the agent loop, not asked to the LLM
+4. arithmetic and clock questions never reach the LLM at all
+5. every generation payload carries keep_alive + num_predict
 """
 
 import json
@@ -95,16 +97,27 @@ def test_conversation_intent_skips_memory_detection(zoey):
     assert calls["ask_ai"] == 1
 
 
-def test_tool_intent_skips_memory_detection(zoey):
+def test_tool_intent_routes_to_agent_loop(zoey, monkeypatch):
     instance, calls = zoey
     instance.orchestrator.intent = "tool"
 
+    agent_messages = []
+
+    def fake_agent_run(message):
+        agent_messages.append(message)
+        return {"type": "response", "content": "Opened Notepad."}
+
+    monkeypatch.setattr(
+        instance.agent_loop, "run", fake_agent_run
+    )
+
     result = instance.respond_structured("open notepad")
 
-    assert result["content"] == "canned answer"
+    assert result["content"] == "Opened Notepad."
+    assert agent_messages == ["open notepad"]
     assert calls["analyze_memory"] == 0
     assert calls["remember"] == 0
-    assert calls["ask_ai"] == 1
+    assert calls["ask_ai"] == 0
 
 
 def test_memory_intent_still_runs_memory_detection(zoey):
